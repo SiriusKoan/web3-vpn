@@ -14,7 +14,7 @@ contract Web3VPNDeploy is Script {
         Web3VPNToken token = new Web3VPNToken();
         console.log("Web3VPNToken deployed at:", address(token));
 
-        Web3VPN web3VPN = new Web3VPN(address(token));
+        Web3VPN web3VPN = new Web3VPN(address(token), 120);
         console.log("Web3VPN deployed at:", address(web3VPN));
 
         vm.stopBroadcast();
