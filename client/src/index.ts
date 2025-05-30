@@ -1,8 +1,37 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { createPublicClient, http, defineChain } from 'viem'
+import { Server, Usage, Web3VPNABI, Web3VPNTokenABI } from './common'
 import * as fs from 'fs';
 import * as path from 'path';
+
+const CONTRACT_ADDRESS = '0xe07d9c6Ceffda8fA63cEc941E88cee1036f11DE4';
+
+// Define zircuit garfield testnet
+const garfieldTestnet = defineChain({
+  id: 48898,
+  name: 'Zircuit Garfield Testnet',
+  network: 'garfield-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://garfield-testnet.zircuit.com/'],
+    },
+    public: {
+      http: ['https://garfield-testnet.zircuit.com/'],
+    },
+  },
+})
+
+const client = createPublicClient({
+  chain: garfieldTestnet,
+  transport: http(),
+});
 
 // Define the version
 const packageJson = JSON.parse(
@@ -51,8 +80,27 @@ program
   .command('list-servers')
   .description('List available VPN servers')
   .option('--full', 'Show full server details')
-  .action((options) => {
-    // Implement server listing logic here
+  .action(async (options) => {
+    const results: any = await client.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: Web3VPNABI,
+      functionName: 'getServers',
+      args: [],
+    });
+    const servers: Server[] = results.map((server: any) => ({
+      endpoint: server.endpoint,
+      name: server.name,
+      owner: server.owner,
+      registrationTime: BigInt(server.registrationTime),
+    }));
+    console.log('Available VPN Servers:');
+    servers.forEach((server) => {
+      console.log(`- ${server.name} (${server.endpoint})`);
+      if (options.full) {
+        console.log(`  Owner: ${server.owner}`);
+        console.log(`  Registered: ${new Date(Number(server.registrationTime) * 1000).toLocaleString()}`);
+      }
+    });
   });
 
 // Parse command line arguments
