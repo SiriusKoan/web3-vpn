@@ -1,9 +1,7 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import { Server, Usage } from './common';
-import * as fs from 'fs';
-import * as path from 'path';
+import { verifyMessage } from 'viem';
 
 // Import the Provider class from provider.ts
 const Provider = require('./provider').Provider;
@@ -23,7 +21,7 @@ export class VpnServer {
     this.port = port;
     this.app = new Koa();
     this.router = new Router();
-    this.provider = new Provider('../wg-test', '../wg-test/privatekey');
+    this.provider = new Provider('../wg-test/provider', '../wg-test/provider/privatekey');
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -56,16 +54,46 @@ export class VpnServer {
     });
   }
 
+  private async verifySignature(address: `0x${string}`, signature: `0x${string}`): Promise<boolean> {
+    try {
+      const message = `It is ${address}`;
+      const isValid = await verifyMessage({
+        address,
+        message,
+        signature,
+      });
+      return isValid;
+    } catch (error) {
+      console.error('Signature verification error:', error);
+      return false;
+    }
+  }
+
   private setupRoutes() {
     // Start VPN service
     this.router.post('/vpn/start', async (ctx: KoaContext) => {
-      const { vpnId, clientPublicKey } = ctx.request.body;
+      const { vpnId, clientPublicKey, address, signature } = ctx.request.body;
 
       if (!vpnId) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'VPN ID is required' };
         return;
       }
+
+      if (!address || !signature) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: 'Ethereum address and signature are required' };
+        return;
+      }
+
+      // Verify signature before proceeding
+      const isValidSignature = await this.verifySignature(address, signature);
+      if (!isValidSignature) {
+        ctx.status = 401;
+        ctx.body = { success: false, message: 'Invalid signature' };
+        return;
+      }
+      console.log("Signature verified successfully");
 
       try {
         // Check if the VPN is already running by calling status
@@ -91,11 +119,25 @@ export class VpnServer {
 
     // Stop VPN service
     this.router.post('/vpn/stop', async (ctx: KoaContext) => {
-      const { vpnId } = ctx.request.body;
+      const { vpnId, address, signature } = ctx.request.body;
 
       if (!vpnId) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'VPN ID is required' };
+        return;
+      }
+
+      if (!address || !signature) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: 'Ethereum address and signature are required' };
+        return;
+      }
+
+      // Verify signature before proceeding
+      const isValidSignature = await this.verifySignature(address, signature);
+      if (!isValidSignature) {
+        ctx.status = 401;
+        ctx.body = { success: false, message: 'Invalid signature' };
         return;
       }
 
@@ -119,10 +161,26 @@ export class VpnServer {
     // Get VPN status
     this.router.get('/vpn/status', async (ctx: KoaContext) => {
       const vpnId = ctx.query.vpnId;
+      const address = ctx.query.address;
+      const signature = ctx.query.signature;
 
       if (!vpnId) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'VPN ID is required' };
+        return;
+      }
+
+      if (!address || !signature) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: 'Ethereum address and signature are required' };
+        return;
+      }
+
+      // Verify signature before proceeding
+      const isValidSignature = await this.verifySignature(address as `0x${string}`, signature as `0x${string}`);
+      if (!isValidSignature) {
+        ctx.status = 401;
+        ctx.body = { success: false, message: 'Invalid signature' };
         return;
       }
 
@@ -146,10 +204,26 @@ export class VpnServer {
     // Get VPN traffic transfer
     this.router.get('/vpn/transfer', async (ctx: KoaContext) => {
       const vpnId = ctx.query.vpnId;
+      const address = ctx.query.address;
+      const signature = ctx.query.signature;
 
       if (!vpnId) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'VPN ID is required' };
+        return;
+      }
+
+      if (!address || !signature) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: 'Ethereum address and signature are required' };
+        return;
+      }
+
+      // Verify signature before proceeding
+      const isValidSignature = await this.verifySignature(address as `0x${string}`, signature as `0x${string}`);
+      if (!isValidSignature) {
+        ctx.status = 401;
+        ctx.body = { success: false, message: 'Invalid signature' };
         return;
       }
 
