@@ -1,0 +1,22 @@
+services:
+  provider:
+    build: provider
+    ports:
+      - 3000:3000
+    volumes:
+      - ./provider:/app
+      - ./wg-test:/wg-test
+    sysctls:
+      - "net.ipv4.ip_forward=1"
+    cap_add:
+      - NET_ADMIN
+  client:
+    build: client
+    volumes:
+      - ./client:/app
+      - ./wg-test:/wg-test
+    sysctls:
+      - "net.ipv4.conf.all.src_valid_mark=1"
+    cap_add:
+      - NET_ADMIN
+    privileged: true
