@@ -1,5 +1,4 @@
 import { createServer } from './server';
-import * as path from 'path';
 import { Command } from 'commander';
 
 const program = new Command();
@@ -11,10 +10,12 @@ program
 
 program
   .option('-p, --port <number>', 'HTTP server port', '3000')
+  .option('--web3-private-key-file <string>', 'Web3 private key for signing', '')
   .action(async (options) => {
     try {
       const port = parseInt(options.port, 10);
-      const server = await createServer(port);
+      const web3PrivateKeyFile = options.web3PrivateKeyFile;
+      const server = await createServer(port, web3PrivateKeyFile);
 
       // Graceful shutdown
       const handleShutdown = async () => {

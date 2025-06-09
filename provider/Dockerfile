@@ -10,4 +10,5 @@ RUN npm i
 
 COPY . /app
 
-CMD npm run dev
+CMD sleep infinity
+#CMD npm run dev -- --web3-private-key-file ../web3/server/privatekey

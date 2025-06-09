@@ -6,6 +6,7 @@ services:
     volumes:
       - ./provider:/app
       - ./wg-test:/wg-test
+      - ./web3:/web3
     sysctls:
       - "net.ipv4.ip_forward=1"
     cap_add:
@@ -15,6 +16,7 @@ services:
     volumes:
       - ./client:/app
       - ./wg-test:/wg-test
+      - ./web3:/web3
     sysctls:
       - "net.ipv4.conf.all.src_valid_mark=1"
     cap_add:

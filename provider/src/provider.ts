@@ -1,15 +1,18 @@
 export class Provider {
   private serverConfigDir: string = '/opt/web3vpn/wireguard'
+  public serverPublicKeyPath: string = '/opt/web3vpn/wireguard/publickey';
+  public serverPublicKey: string = '';
   private serverPrivateKeyPath: string = '/opt/web3vpn/wireguard/privatekey';
   private serverPrivateKey: string = '';
 
-  constructor(serverConfigDir: string, serverPrivateKeyPath: string) {
+  constructor(serverConfigDir: string, serverPublicKeyPath: string, serverPrivateKeyPath: string) {
     this.serverConfigDir = serverConfigDir;
+    this.serverPublicKeyPath = serverPublicKeyPath;
     this.serverPrivateKeyPath = serverPrivateKeyPath;
-    this.loadPrivateKey();
+    this.loadKey();
   }
 
-  loadPrivateKey() {
+  loadKey() {
     const fs = require('fs');
     try {
       if (fs.existsSync(this.serverPrivateKeyPath)) {
@@ -17,8 +20,14 @@ export class Provider {
       } else {
         throw new Error(`Private key file not found at ${this.serverPrivateKeyPath}`);
       }
+
+      if (fs.existsSync(this.serverPublicKeyPath)) {
+        this.serverPublicKey = fs.readFileSync(this.serverPublicKeyPath, 'utf8').trim();
+      } else {
+        throw new Error(`Public key file not found at ${this.serverPublicKeyPath}`);
+      }
     } catch (error) {
-      console.error('Error loading private key:', error);
+      console.error('Error loading keys:', error);
       throw error;
     }
   }
