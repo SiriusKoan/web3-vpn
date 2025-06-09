@@ -217,12 +217,12 @@ contract Web3VPNTest is Test {
 
         // Attempt to submit again within the interval
         vm.startPrank(serverOwner);
-        vm.expectRevert("Must wait for the submit interval");
+        vm.expectRevert("Client usage report too frequent");
         vpn.submitUsageReport(serverUsage, clientUsage, serverSignature, clientSignature);
         vm.stopPrank();
 
         vm.startPrank(client);
-        vm.expectRevert("Must wait for the submit interval");
+        vm.expectRevert("Client usage report too frequent");
         vpn.submitUsageReport(serverUsage, clientUsage, serverSignature, clientSignature);
         vm.stopPrank();
     }

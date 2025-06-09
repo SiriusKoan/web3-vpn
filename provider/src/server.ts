@@ -1,8 +1,8 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import { serializeUsage, Web3VPNABI, signUsage, CONTRACT_ADDRESS } from './common';
-import { verifyMessage, defineChain } from 'viem';
+import { Web3VPNABI, signUsage, CONTRACT_ADDRESS } from './common';
+import { verifyMessage, defineChain, createPublicClient } from 'viem';
 import { SignableMessage } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts'
 import { createWalletClient, http } from 'viem';
@@ -32,6 +32,11 @@ const garfieldTestnet = defineChain({
     },
   },
 })
+
+const publicClient = createPublicClient({
+  chain: garfieldTestnet,
+  transport: http(),
+});
 
 export class VpnServer {
   private app: any;
@@ -137,6 +142,24 @@ export class VpnServer {
       if (!address || !signature) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'Ethereum address and signature are required' };
+        return;
+      }
+
+      try {
+        const isClientValid = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: Web3VPNABI,
+          functionName: 'checkClientValid',
+          args: [address],
+        });
+        if (!isClientValid) {
+          ctx.status = 403;
+          ctx.body = { success: false, message: 'Client is not valid' };
+          return;
+        }
+      } catch (error: any) {
+        ctx.status = 500;
+        ctx.body = { success: false, message: `Failed to check client validity: ${error.message}` };
         return;
       }
 

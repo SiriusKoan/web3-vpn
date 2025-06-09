@@ -36,11 +36,6 @@ contract Web3VPN is EIP712 {
         submitInterval = _submitInterval;
     }
 
-    modifier onlyAfterInterval() {
-        require(block.timestamp >= lastSubmitTime[msg.sender] + submitInterval, "Must wait for the submit interval");
-        _;
-    }
-
     function getServers() public view returns (Server[] memory) {
         return servers;
     }
@@ -84,7 +79,9 @@ contract Web3VPN is EIP712 {
         Usage calldata clientUsage,
         bytes calldata serverSignature,
         bytes calldata clientSignature
-    ) public onlyAfterInterval {
+    ) public {
+        // Check client submit timestamp
+        require(block.timestamp - lastSubmitTime[serverUsage.clientAddr] >= submitInterval, "Client usage report too frequent");
         // Basic validation checks
         require(msg.sender == clientUsage.clientAddr || msg.sender == serverUsage.serverAddr, "Unauthorized sender");
         require(serverUsage.bytesUsed > 0, "Server usage must be greater than zero");
