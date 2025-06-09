@@ -1,16 +1,37 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import { serializeUsage, Usage } from './common';
-import { verifyMessage } from 'viem';
+import { serializeUsage, Web3VPNABI, signUsage, CONTRACT_ADDRESS } from './common';
+import { verifyMessage, defineChain } from 'viem';
 import { SignableMessage } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts'
+import { createWalletClient, http } from 'viem';
 import { Provider } from './provider';
-const fs = require('fs');
+import fs from 'fs';
 
 // Type declarations for Koa context and next function
 type KoaContext = any;
 type KoaNext = () => Promise<void>;
+
+
+const garfieldTestnet = defineChain({
+  id: 48898,
+  name: 'Zircuit Garfield Testnet',
+  network: 'garfield-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://garfield-testnet.zircuit.com/'],
+    },
+    public: {
+      http: ['https://garfield-testnet.zircuit.com/'],
+    },
+  },
+})
 
 export class VpnServer {
   private app: any;
@@ -19,6 +40,7 @@ export class VpnServer {
   private port: number;
   private serverInstance: any = null;
   private web3PrivateKey: `0x${string}`;
+  private viemClient: any;
 
   constructor(port: number, web3PrivateKeyFile: string) {
     this.port = port;
@@ -31,10 +53,15 @@ export class VpnServer {
       if (!key.startsWith('0x')) {
         key = '0x' + key;
       }
-      this.web3PrivateKey = key;
+      this.web3PrivateKey = key as `0x${string}`;
     } catch (err) {
       throw new Error(`Failed to read private key file: ${err}`);
     }
+
+    this.viemClient = createWalletClient({
+      chain: garfieldTestnet,
+      transport: http(),
+    });
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -146,7 +173,7 @@ export class VpnServer {
     // Stop VPN service
     this.router.post('/vpn/stop', async (ctx: KoaContext) => {
       console.log(ctx.request.body);
-      const { vpnId, address, signature, clientUsage, clientSignature }: { vpnId: string; address: `0x${string}`; signature: `0x${string}`; clientUsage: {[key: string]: string}; clientSignature: `0x${string}` } = ctx.request.body;
+      const { vpnId, address, signature, clientUsageRaw, clientSignature }: { vpnId: string; address: `0x${string}`; signature: `0x${string}`; clientUsageRaw: string; clientSignature: `0x${string}` } = ctx.request.body;
 
       if (!vpnId) {
         ctx.status = 400;
@@ -160,11 +187,14 @@ export class VpnServer {
         return;
       }
 
-      if (!clientUsage || !clientSignature) {
+      if (!clientUsageRaw || !clientSignature) {
         ctx.status = 400;
         ctx.body = { success: false, message: 'Client usage data and signature are required' };
         return;
       }
+      const clientUsage = JSON.parse(clientUsageRaw);
+      clientUsage.bytesUsed = BigInt(clientUsage.bytesUsed);
+      clientUsage.timestamp = BigInt(clientUsage.timestamp);
 
       // Verify signature before proceeding
       const isValidSignature = await this.verifySignature(address, signature, `It is ${address}`);
@@ -183,31 +213,41 @@ export class VpnServer {
           return;
         }
 
-        await this.provider.stop(vpnId);
+        console.log("Submitting verified usage to contract");
+        try {
+          const serverUsage = {
+            serverAddr: privateKeyToAccount(this.web3PrivateKey).address,
+            clientAddr: address,
+            bytesUsed: (() => {
+              const response = this.provider.transfer(vpnId);
+              return BigInt(response.inbound || 0) + BigInt(response.outbound || 0);
+            })(),
+            timestamp: BigInt(Math.floor(Date.now() / 1000)),
+          };
+          const account = privateKeyToAccount(this.web3PrivateKey);
+          const serverSignature = await signUsage(serverUsage, account);
 
-        if (await this.verifySignature(address, clientSignature, serializeUsage(clientUsage))) {
-          console.log("Submitting verified usage to contract");
-          try {
-            const serverUsage = {
-              serverAddr: this.provider.getServerAddress() as `0x${string}`,
-              clientAddr: address,
-              bytesUsed: clientUsage.bytesUsed.toString(),
-              timestamp: BigInt(Math.floor(Date.now() / 1000)).toString(),
-            };
-            const serverSignature = await this.provider.signUsage(serializeUsage(serverUsage));
+          const args = [
+            {serverAddr: serverUsage.serverAddr, clientAddr: serverUsage.clientAddr, bytesUsed: serverUsage.bytesUsed, timestamp: serverUsage.timestamp},
+            {serverAddr: clientUsage.serverAddr, clientAddr: clientUsage.clientAddr, bytesUsed: clientUsage.bytesUsed, timestamp: clientUsage.timestamp},
+            serverSignature,
+            clientSignature,
+          ];
 
-            // await this.provider.submitUsageReport(
-            //   serverUsage,
-            //   clientUsage,
-            //   serverSignature,
-            //   clientSignature
-            // );
+          await this.viemClient.writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: Web3VPNABI,
+            functionName: 'submitUsageReport',
+            args: args,
+            account: account,
+          });
 
-            console.log(`Usage report submitted for client ${address} with ${clientUsage.bytesUsed} bytes used`);
-          } catch (error) {
-            console.error("Failed to submit usage report:", error);
-          }
+          console.log(`Usage report submitted for client ${address} with ${clientUsage.bytesUsed} bytes used`);
+        } catch (error) {
+          console.error("Failed to submit usage report:", error);
         }
+
+        await this.provider.stop(vpnId);
 
         ctx.body = { success: true, message: `VPN service with ID ${vpnId} stopped successfully` };
       } catch (error: any) {

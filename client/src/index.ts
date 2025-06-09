@@ -3,12 +3,11 @@
 import { Command } from 'commander';
 import { createPublicClient, createWalletClient, http, defineChain } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { Server, Web3VPNABI, serializeUsage } from './common'
+import { CONTRACT_ADDRESS, Server, Web3VPNABI, serializeUsage, signUsage } from './common'
 import { generateClientConfig } from './client';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CONTRACT_ADDRESS = '0xe07d9c6Ceffda8fA63cEc941E88cee1036f11DE4';
 const DEFAULT_WG_DIR = '/opt/web3vpn/wg';
 const DEFAULT_WG_PUBLIC_KEY_FILENAME = '/opt/web3vpn/wg/publickey';
 const DEFAULT_WG_PRIVATE_KEY_FILENAME = '/opt/web3vpn/wg/privatekey';
@@ -220,6 +219,7 @@ program
   .action(async () => {
     console.log('Disconnecting from VPN...');
     const serverAddr = program.opts().server;
+    const wgDir = program.opts().wgDir || DEFAULT_WG_DIR;
     const privateKeyFilename = program.opts().privateKey || DEFAULT_WEB3_PRIVATE_KEY_FILENAME;
 
     // Read private key for signing
@@ -335,8 +335,8 @@ program
         clientUsage = {
           serverAddr: serverWeb3Addr as `0x${string}`,
           clientAddr: account.address,
-          bytesUsed: bytesUsed.toString(),
-          timestamp: BigInt(Math.floor(Date.now() / 1000)).toString()
+          bytesUsed: bytesUsed,
+          timestamp: BigInt(Math.floor(Date.now() / 1000)),
         };
       } catch (error: any) {
         console.error('Failed to get server address:', error.message);
@@ -346,9 +346,7 @@ program
       // Sign client usage
       let clientSignature;
       try {
-        clientSignature = await walletClient.signMessage({
-          message: serializeUsage(clientUsage),
-        });
+        clientSignature = await signUsage(clientUsage, account);
         console.log(`Client usage signature generated`);
       } catch (error: any) {
         console.error('Failed to sign client usage:', error);
@@ -364,7 +362,7 @@ program
         vpnId: vpnId,
         address: account.address,
         signature: signature,
-        clientUsage: serializeUsage(clientUsage),
+        clientUsageRaw: serializeUsage(clientUsage),
         clientSignature: clientSignature
       });
 
@@ -412,7 +410,7 @@ program
       // Bring down the WireGuard interface using wg-quick
       try {
         const { execSync } = require('child_process');
-        const configPath = path.join(DEFAULT_WG_DIR, `${wgInterface}.conf`);
+        const configPath = path.join(wgDir, `${wgInterface}.conf`);
         execSync(`wg-quick down ${configPath}`);
         console.log(`WireGuard interface ${wgInterface} brought down successfully using config ${configPath}.`);
       } catch (err: any) {
