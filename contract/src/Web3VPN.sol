@@ -23,7 +23,7 @@ event UsageUploaded(address indexed serverAddr, address indexed clientAddr, uint
 
 contract Web3VPN is EIP712 {
     bytes32 private constant USAGE_TYPEHASH =
-        keccak256("Usage(address serverAddr,address clientAddr,uint256 bytesUsed)");
+        keccak256("Usage(address serverAddr,address clientAddr,uint256 bytesUsed,uint256 timestamp)");
 
     address public tokenAddress;
     uint256 public submitInterval;
@@ -43,6 +43,10 @@ contract Web3VPN is EIP712 {
 
     function getServers() public view returns (Server[] memory) {
         return servers;
+    }
+
+    function checkClientValid(address owner) public view returns (bool) {
+        return balances[owner] >= 1000 * 1e18;
     }
 
     function getBytePrice() public pure returns (uint256) {
@@ -122,7 +126,7 @@ contract Web3VPN is EIP712 {
     }
 
     function _verifySignature(Usage calldata usage, bytes calldata signature) internal view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(USAGE_TYPEHASH, usage.serverAddr, usage.clientAddr, usage.bytesUsed));
+        bytes32 structHash = keccak256(abi.encode(USAGE_TYPEHASH, usage.serverAddr, usage.clientAddr, usage.bytesUsed, usage.timestamp));
         bytes32 digest = _hashTypedDataV4(structHash);
         return ECDSA.recover(digest, signature);
     }

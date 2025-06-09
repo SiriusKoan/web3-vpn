@@ -66,9 +66,9 @@ contract Web3VPNTest is Test {
 
     // Helper function to create a signature for a usage report
     function signUsage(Usage memory usage, uint256 signerPrivateKey) public view returns (bytes memory) {
-        bytes32 USAGE_TYPEHASH = keccak256("Usage(address serverAddr,address clientAddr,uint256 bytesUsed)");
+        bytes32 USAGE_TYPEHASH = keccak256("Usage(address serverAddr,address clientAddr,uint256 bytesUsed,uint256 timestamp)");
 
-        bytes32 structHash = keccak256(abi.encode(USAGE_TYPEHASH, usage.serverAddr, usage.clientAddr, usage.bytesUsed));
+        bytes32 structHash = keccak256(abi.encode(USAGE_TYPEHASH, usage.serverAddr, usage.clientAddr, usage.bytesUsed, usage.timestamp));
 
         // EIP712 domain separator is handled by the _hashTypedDataV4 function in the contract
         bytes32 digest = _hashTypedDataV4(structHash);
