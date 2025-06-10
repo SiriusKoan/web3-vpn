@@ -172,8 +172,8 @@ export class Provider {
 PrivateKey = ${this.serverPrivateKey}
 Address = 10.0.${ID}.1/32
 ListenPort = ${50000 + Number(ID)}
-PostUp = iptables -A FORWARD -i ${interfaceName} -j ACCEPT
-PostDown = iptables -D FORWARD -i ${interfaceName} -j ACCEPT
+PostUp = iptables -A FORWARD -i ${interfaceName} -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i ${interfaceName} -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
 [Peer]
 PublicKey = ${clientPublicKey}
